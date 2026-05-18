@@ -1223,7 +1223,9 @@ def change_password():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/fx/rates", methods=["GET"])
+@app.route("/get_maps_key", methods=["GET"])
+def get_maps_key():
+    return jsonify({"key": GOOGLE_API_KEY})
 def fx_rates():
     try:
         import requests as req
