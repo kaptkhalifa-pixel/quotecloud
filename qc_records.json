@@ -1,0 +1,168 @@
+[
+  {
+    "number": "HF-2026-001",
+    "type": "Invoice",
+    "client_name": "khalif",
+    "client_email": "kk",
+    "amount": 13000.0,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T14:19:09.969559",
+    "result_summary": {}
+  },
+  {
+    "number": "HF-2026-002",
+    "type": "Invoice",
+    "client_name": "khalif",
+    "client_email": "",
+    "amount": 650,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T14:30:46.041523",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-2026-003",
+    "type": "Quotation",
+    "client_name": "khalif",
+    "client_email": "",
+    "amount": 2300,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T14:32:59.261823",
+    "result_summary": {
+      "ac_label": "Airbus AS350 (5 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-2026-004",
+    "type": "Quotation",
+    "client_name": "jose",
+    "client_email": "",
+    "amount": 3460,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T14:38:13.599330",
+    "result_summary": {
+      "ac_label": "",
+      "mission": "pick_and_drop"
+    }
+  },
+  {
+    "number": "HF-Q-2026-001",
+    "type": "Quotation",
+    "client_name": "john",
+    "client_email": "john@john",
+    "amount": 2570,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T15:33:18.664227",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-002",
+    "type": "Quotation",
+    "client_name": "john",
+    "client_email": "john@john",
+    "amount": 6700,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T15:33:22.036484",
+    "result_summary": {
+      "ac_label": "Pilatus pc12 (8 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-003",
+    "type": "Quotation",
+    "client_name": "jose",
+    "client_email": "asdfghj",
+    "amount": 2570,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T15:44:17.475348",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-004",
+    "type": "Quotation",
+    "client_name": "jose",
+    "client_email": "asdfghj",
+    "amount": 650,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T15:44:51.265532",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-005",
+    "type": "Quotation",
+    "client_name": "kk",
+    "client_email": "kk",
+    "amount": 650,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T16:01:01.679827",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-006",
+    "type": "Quotation",
+    "client_name": "bebe",
+    "client_email": " bebe@",
+    "amount": 1610,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T16:02:43.574738",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-007",
+    "type": "Quotation",
+    "client_name": "lucy",
+    "client_email": "lucy@lucy",
+    "amount": 1730,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T16:12:46.921766",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-008",
+    "type": "Quotation",
+    "client_name": "jose kairo",
+    "client_email": "lucy@lucy",
+    "amount": 1250,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T16:31:09.050594",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  },
+  {
+    "number": "HF-Q-2026-009",
+    "type": "Quotation",
+    "client_name": "jose",
+    "client_email": "lucy@lucy",
+    "amount": 1730,
+    "date": "18/05/2026",
+    "timestamp": "2026-05-18T16:39:32.896675",
+    "result_summary": {
+      "ac_label": "Piper PA32 (4 seater)",
+      "mission": "one_way"
+    }
+  }
+]

@@ -1,12 +1,13 @@
 # =========================================================
 # QUOTECLOUD BY JETMAN GLOBAL
-# app.py v2.3.2
-# v2.3.2 fix:
-#   - BUG: Removed hq.route_distance patch (not in engine)
-#   - Routing mode stored per aircraft, ready for engine fix
-#   - All other v2.3.1 fixes retained
+# app.py v2.4.3
+# v2.4.3 fixes:
+#   - BANK DETAILS / TERMS & CONDITIONS titles via API fields
+#   - Removed duplicate titles from body text
+#   - Indentation errors fixed
+#   - All v2.4.2 features retained
 # =========================================================
-import sys, os, json, re, urllib.parse, pathlib, datetime
+import sys, os, json, re, pathlib, datetime
 sys.path.insert(0, os.path.dirname(__file__))
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
 from functools import wraps
@@ -15,6 +16,8 @@ import quotecloud_engine as hq
 app = Flask(__name__)
 
 OPERATOR_CONFIG_FILE = "operator_config.json"
+AIRCRAFT_CONFIG_FILE = "hf_aircraft.json"
+RECORDS_FILE = "qc_records.json"
 
 def load_operator_config():
     p = pathlib.Path(OPERATOR_CONFIG_FILE)
@@ -28,10 +31,10 @@ def load_operator_config():
 OPERATOR = load_operator_config()
 
 app.secret_key = os.environ.get("SECRET_KEY", OPERATOR.get("env", {}).get("secret_key", "qc-secret-2026"))
+app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "AIzaSyByT9tWG6pHLXslzp5aJFElULC9oJwXu5o")
 INVGEN_API_KEY = os.environ.get("INVGEN_API_KEY", "sk_elcdkPBJLZnAMEghIVyDc6llmS0iOraY")
-AIRCRAFT_CONFIG_FILE = "hf_aircraft.json"
 
 def get_admin_user():
     return os.environ.get("ADMIN_USER", OPERATOR.get("env", {}).get("admin_user", "admin"))
@@ -46,9 +49,22 @@ def get_quoting_rules():
         "max_flight_hours_per_day": 10.0,
         "max_idle_days_between_legs": 1,
         "show_distance_to_client": False,
+        "ground_time_buffer_enabled": False,
+        "ground_time_buffer_minutes": 0,
         "currency": "USD",
         "currency_symbol": "$",
         "quote_validity_hours": 48
+    })
+
+def get_geo_lock():
+    return OPERATOR.get("geo_lock", {
+        "enabled": True,
+        "region_name": "Kenya",
+        "preset": "kenya",
+        "lat_min": -5.0,
+        "lat_max": 5.0,
+        "lon_min": 33.5,
+        "lon_max": 42.0
     })
 
 def get_whatsapp():
@@ -56,6 +72,38 @@ def get_whatsapp():
 
 def get_aircraft_mode():
     return OPERATOR.get("aircraft_mode", "helicopter")
+
+def get_region_name():
+    return OPERATOR.get("geo_lock", {}).get("region_name", "Kenya")
+
+def get_company_from_block():
+    c = OPERATOR.get("contact", {})
+    lines = [
+        OPERATOR.get("company_name", ""),
+        c.get("address", ""),
+        c.get("email", ""),
+        c.get("phone", "")
+    ]
+    return "\n".join([l for l in lines if l])
+
+def get_bank_details_block():
+    bank = OPERATOR.get("bank", {})
+    lines = []
+    if bank.get("account_name"):
+        lines.append(bank["account_name"].upper())
+    if bank.get("bank_name") and bank.get("branch"):
+        lines.append(f"{bank['bank_name'].upper()} | BANK CODE: {bank.get('branch','').split(',')[-1].strip()} | SWIFT: {bank.get('swift','')}")
+    elif bank.get("bank_name"):
+        lines.append(bank["bank_name"].upper())
+    if bank.get("usd_account"):
+        lines.append(f"USD A/C: {bank['usd_account']}")
+    if bank.get("kes_account"):
+        lines.append(f"KES A/C: {bank['kes_account']}")
+    if bank.get("branch"):
+        lines.append(f"{bank['branch'].upper()}")
+    if bank.get("paybill"):
+        lines.append(f"PAYBILL: {bank['paybill']}")
+    return "\n".join(lines)
 
 hq.load_airports()
 
@@ -73,6 +121,8 @@ def login():
     if request.method == "POST":
         if (request.form.get("username") == get_admin_user() and
                 request.form.get("password") == get_admin_pass()):
+            remember = request.form.get("remember") == "on"
+            session.permanent = remember
             session["logged_in"] = True
             return redirect(url_for("index"))
         error = "Invalid credentials. Please try again."
@@ -90,7 +140,7 @@ def load_aircraft():
             return json.loads(p.read_text())
         except Exception:
             pass
-    return {
+    default = {
         "as350": {
             "label": "Airbus AS350",
             "seater": 5,
@@ -104,9 +154,68 @@ def load_aircraft():
             "routing_mode": "standard"
         }
     }
+    pathlib.Path(AIRCRAFT_CONFIG_FILE).write_text(json.dumps(default, indent=2))
+    return default
 
 def save_aircraft(data):
     pathlib.Path(AIRCRAFT_CONFIG_FILE).write_text(json.dumps(data, indent=2))
+
+def load_records():
+    p = pathlib.Path(RECORDS_FILE)
+    if p.exists():
+        try:
+            return json.loads(p.read_text())
+        except Exception:
+            pass
+    return []
+
+def save_records(records):
+    pathlib.Path(RECORDS_FILE).write_text(json.dumps(records, indent=2))
+
+def next_record_number(doc_type="Quotation"):
+    records = load_records()
+    prefix = OPERATOR.get("invoice", {}).get("prefix", "QC")
+    year = datetime.date.today().year
+    if doc_type in ("Quotation", "Quote"):
+        type_code = "Q"
+    elif doc_type == "Invoice":
+        type_code = "I"
+    elif doc_type == "Receipt":
+        type_code = "R"
+    else:
+        type_code = "Q"
+    seq = len([r for r in records
+               if str(year) in r.get("number", "") and
+               f"-{type_code}-" in r.get("number", "")]) + 1
+    return f"{prefix}-{type_code}-{year}-{seq:03d}"
+
+def save_record(record_type, client_name, client_email, amount, doc_number, result=None):
+    records = load_records()
+    records.append({
+        "number": doc_number,
+        "type": record_type,
+        "client_name": client_name,
+        "client_email": client_email,
+        "amount": amount,
+        "date": datetime.date.today().strftime("%d/%m/%Y"),
+        "timestamp": datetime.datetime.now().isoformat(),
+        "result_summary": result or {}
+    })
+    save_records(records)
+
+def check_geo_lock(lat, lon):
+    geo = get_geo_lock()
+    if not geo.get("enabled", True):
+        return True
+    return (float(geo.get("lat_min", -5.0)) <= lat <= float(geo.get("lat_max", 5.0)) and
+            float(geo.get("lon_min", 33.5)) <= lon <= float(geo.get("lon_max", 42.0)))
+
+def geo_lock_error(location_name):
+    wa = get_whatsapp()
+    region = get_region_name()
+    wa_msg = f" Please WhatsApp us: +{wa} if you believe this is an error or to discuss a custom charter." if wa else ""
+    return (f"We're sorry - '{location_name}' appears to be outside our operating region. "
+            f"Our services are currently available within {region}.{wa_msg}")
 
 def reverse_geocode(lat, lon):
     try:
@@ -151,6 +260,8 @@ def resolve_location(s, user_label=None):
     s = s.replace(",+", ",").replace("%2C+", ",")
     try:
         lat, lon = hq.parse_map_pin(s)
+        if not check_geo_lock(lat, lon):
+            return None, s
         display = reverse_geocode(lat, lon) or f"Pin, {lat:.5f}, {lon:.5f}"
         return display, f"{lat},{lon}"
     except Exception:
@@ -162,6 +273,8 @@ def resolve_location(s, user_label=None):
         s = place
     try:
         lat, lon = hq.lookup_coords(s)
+        if not check_geo_lock(lat, lon):
+            return None, s
         return s.title(), s
     except Exception:
         pass
@@ -174,7 +287,8 @@ def resolve_location(s, user_label=None):
         return None, s
     try:
         import requests as req
-        query = clean if "kenya" in clean.lower() else clean + " Kenya"
+        region = OPERATOR.get("geo_lock", {}).get("region_name", "Kenya")
+        query = clean if region.lower() in clean.lower() else clean + f" {region}"
         r = req.get("https://maps.googleapis.com/maps/api/geocode/json",
                     params={"address": query, "key": GOOGLE_API_KEY, "region": "ke"},
                     timeout=5)
@@ -182,7 +296,7 @@ def resolve_location(s, user_label=None):
         if data.get("status") == "OK":
             loc = data["results"][0]["geometry"]["location"]
             lat, lon = float(loc["lat"]), float(loc["lng"])
-            if -5.0 <= lat <= 5.0 and 33.5 <= lon <= 42.0:
+            if check_geo_lock(lat, lon):
                 return original_input.strip().title(), f"{lat},{lon}"
     except Exception:
         pass
@@ -220,30 +334,36 @@ def apply_display_names(result, display_map):
             apply_display_names(result[key], display_map)
     return result
 
-def enrich_segments(segments, speed, rate):
+def enrich_segments(segments):
     for s in (segments or []):
-        if not s.get("dist_nm") and s.get("hours") and speed:
-            s["dist_nm"] = round(float(s["hours"]) * float(speed), 1)
-        if not s.get("hours") and s.get("dist_nm") and speed:
-            s["hours"] = round(float(s["dist_nm"]) / float(speed), 2)
-        if not s.get("cost_usd") and s.get("hours") and rate:
-            s["cost_usd"] = round(float(s["hours"]) * float(rate), 2)
+        if s.get("nm") and not s.get("dist_nm"):
+            s["dist_nm"] = s["nm"]
     return segments
 
-def enrich_result(result, speed, rate):
+def enrich_result(result):
     if not result:
         return result
-    result["segments"] = enrich_segments(result.get("segments", []), speed, rate)
+    enrich_segments(result.get("segments", []))
     for key in ("drop", "pick", "option_a", "option_b"):
         if result.get(key):
-            enrich_result(result[key], speed, rate)
+            enrich_result(result[key])
+    return result
+
+def apply_ground_time_buffer(result, buffer_hours):
+    if not result or buffer_hours <= 0:
+        return result
+    for s in (result.get("segments") or []):
+        if s.get("type") == "revenue":
+            s["hours"] = round(float(s.get("hours", 0)) + buffer_hours, 2)
+    for key in ("drop", "pick", "option_a", "option_b"):
+        if result.get(key):
+            apply_ground_time_buffer(result[key], buffer_hours)
     return result
 
 def validate_safari_legs(legs, rules):
     wa = get_whatsapp()
     max_idle = int(rules.get("max_idle_days_between_legs", 1))
     wa_msg = f" For assistance, WhatsApp us: +{wa}" if wa else ""
-
     dates = []
     for L in legs:
         if L.get("date"):
@@ -251,12 +371,10 @@ def validate_safari_legs(legs, rules):
                 dates.append(datetime.datetime.strptime(L["date"], "%d/%m/%y").date())
             except Exception:
                 pass
-
     if dates:
         span = (max(dates) - min(dates)).days
         if span > 7:
-            return f"This safari itinerary spans {span} days which exceeds the maximum of 7 days. Please restructure your itinerary or contact us for a custom quote.{wa_msg}"
-
+            return f"This safari itinerary spans {span} days which exceeds the maximum of 7 days.{wa_msg}"
         sorted_dates = sorted(dates)
         prev_date = None
         for d in sorted_dates:
@@ -264,9 +382,8 @@ def validate_safari_legs(legs, rules):
                 gap = (d - prev_date).days
                 idle = gap - 1
                 if idle > max_idle:
-                    return f"This itinerary has {idle} idle day(s) between legs which exceeds the maximum of {max_idle} day(s) allowed. Please adjust your dates or contact us for assistance.{wa_msg}"
+                    return f"This itinerary has {idle} idle day(s) between legs which exceeds the maximum of {max_idle} day(s).{wa_msg}"
             prev_date = d
-
     return None
 
 def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
@@ -278,6 +395,9 @@ def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
     rate = float(ac_cfg["rate"])
     routing_mode = ac_cfg.get("routing_mode", "standard")
     wa = get_whatsapp()
+    buffer_enabled = rules.get("ground_time_buffer_enabled", False)
+    buffer_mins = float(rules.get("ground_time_buffer_minutes", 0))
+    buffer_hours = (buffer_mins / 60.0) if buffer_enabled and buffer_mins > 0 else 0
 
     orig = hq.AIRCRAFT.copy()
     orig_pax = hq.PAX_ADMIN_FEE_USD
@@ -293,13 +413,11 @@ def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
     try:
         if mission == "one_way":
             result = hq.compute_one_way(pickup_coord, dropoff_coord, ac_key)
-
         elif mission == "return":
             d0 = datetime.datetime.strptime(depart, "%d/%m/%y").date()
             d1 = datetime.datetime.strptime(ret, "%d/%m/%y").date()
             wait_days = max((d1 - d0).days, 0)
             wa_msg = f" For questions, WhatsApp us: +{wa}" if wa else ""
-
             option_a = hq.compute_return(pickup_coord, dropoff_coord, depart, ret, ac_key)
             drop = hq.compute_one_way(pickup_coord, dropoff_coord, ac_key)
             for sg in drop["segments"]:
@@ -309,7 +427,6 @@ def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
             for sg in pick["segments"]:
                 if sg.get("type") == "revenue":
                     sg["date"] = d1.strftime("%d/%m/%y")
-
             option_b = {
                 "mission": "pick_and_drop",
                 "drop": drop,
@@ -317,14 +434,12 @@ def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
                 "warning": "",
                 "total_usd": round(drop["total_usd"] + pick["total_usd"], 2)
             }
-
             pickup_drop_msg = (
                 f"This return trip exceeds {max_nights} night(s). Based on our aircraft "
                 f"utilization schedule and operational commitments, only the Pick & Drop "
                 f"option is available for stays of this duration. Our team will coordinate "
                 f"both flights to ensure a seamless experience.{wa_msg}"
             )
-
             result = {
                 "mission": "return_both",
                 "option_a": option_a,
@@ -333,7 +448,6 @@ def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
                 "max_nights": max_nights,
                 "pickup_drop_msg": pickup_drop_msg
             }
-
         elif mission == "safari":
             result = hq.compute_safari(legs, ac_key)
         else:
@@ -342,7 +456,10 @@ def compute_for_aircraft(mission, ac_key, ac_cfg, pickup_coord, dropoff_coord,
         if display_map:
             apply_display_names(result, display_map)
 
-        enrich_result(result, speed, rate)
+        enrich_result(result)
+
+        if buffer_hours > 0:
+            apply_ground_time_buffer(result, buffer_hours)
 
         result["ac_label"] = f"{ac_cfg['label']} ({ac_cfg['seater']} seater)"
         result["ac_key"] = ac_key
@@ -396,30 +513,28 @@ def run_quote_engine(data):
             p_disp, p_coord = resolve_location(raw_p, user_label=raw_p)
             d_disp, d_coord = resolve_location(raw_d, user_label=raw_d)
             if p_disp is None:
-                return {"error": f"Not recognised: {repr(raw_p)}. Use location name, Maps link or coordinates.", "not_found": raw_p}, 400
+                return {"error": geo_lock_error(raw_p), "not_found": raw_p}, 400
             if d_disp is None:
-                return {"error": f"Not recognised: {repr(raw_d)}. Use location name, Maps link or coordinates.", "not_found": raw_d}, 400
+                return {"error": geo_lock_error(raw_d), "not_found": raw_d}, 400
             display_map[p_coord] = p_disp
             display_map[d_coord] = d_disp
             results = [compute_for_aircraft("one_way", k, v, p_coord, d_coord,
                                             display_map=display_map) for k, v in active.items()]
-
         elif mission == "return":
             raw_p = data.get("pickup", "")
             raw_d = data.get("dropoff", "")
             p_disp, p_coord = resolve_location(raw_p, user_label=raw_p)
             d_disp, d_coord = resolve_location(raw_d, user_label=raw_d)
             if p_disp is None:
-                return {"error": f"Not recognised: {repr(raw_p)}.", "not_found": raw_p}, 400
+                return {"error": geo_lock_error(raw_p), "not_found": raw_p}, 400
             if d_disp is None:
-                return {"error": f"Not recognised: {repr(raw_d)}.", "not_found": raw_d}, 400
+                return {"error": geo_lock_error(raw_d), "not_found": raw_d}, 400
             display_map[p_coord] = p_disp
             display_map[d_coord] = d_disp
             results = [compute_for_aircraft("return", k, v, p_coord, d_coord,
                                             depart=data.get("depart", ""),
                                             ret=data.get("return_date", ""),
                                             display_map=display_map) for k, v in active.items()]
-
         elif mission == "safari":
             legs = []
             for L in (data.get("legs") or []):
@@ -428,17 +543,15 @@ def run_quote_engine(data):
                 o_disp, o_coord = resolve_location(raw_o, user_label=raw_o)
                 d_disp2, d_coord2 = resolve_location(raw_d2, user_label=raw_d2)
                 if o_disp is None:
-                    return {"error": f"Not recognised: {repr(raw_o)}.", "not_found": raw_o}, 400
+                    return {"error": geo_lock_error(raw_o), "not_found": raw_o}, 400
                 if d_disp2 is None:
-                    return {"error": f"Not recognised: {repr(raw_d2)}.", "not_found": raw_d2}, 400
+                    return {"error": geo_lock_error(raw_d2), "not_found": raw_d2}, 400
                 display_map[o_coord] = o_disp
                 display_map[d_coord2] = d_disp2
                 legs.append({"origin": o_coord, "destination": d_coord2, "date": L.get("date", "")})
-
             safari_error = validate_safari_legs(legs, rules)
             if safari_error:
                 return {"error": safari_error}, 400
-
             results = [compute_for_aircraft("safari", k, v, None, None,
                                             legs=legs, display_map=display_map) for k, v in active.items()]
         else:
@@ -448,6 +561,96 @@ def run_quote_engine(data):
 
     except Exception as e:
         return {"error": str(e)}, 400
+
+def build_pdf_payload_from_result(doc_type, result, client_name, client_email,
+                                   client_phone, note, discount, extra_items):
+    segments = result.get("segments", [])
+    items = []
+    total_hrs = sum(float(s.get("hours", 0)) for s in segments)
+    rate = result.get("rate_usd", 0)
+    ac_label = result.get("ac_label", "Aircraft")
+
+    routing_lines = []
+    for s in segments:
+        nm = s.get("nm") or s.get("dist_nm") or 0
+        hrs = s.get("hours", 0)
+        seg_type = s.get("type", "").title()
+        origin = s.get("origin", "")
+        dest = s.get("destination", "")
+        date = s.get("date", "")
+        date_str = f"{date} " if date else ""
+        routing_lines.append(
+            f"{date_str}{origin} -> {dest} {float(hrs):.1f} hrs | {float(nm):.1f} NM ({seg_type})"
+        )
+    routing_text = "Routing:\n" + "\n".join(routing_lines) if routing_lines else ""
+    note_line = f"Note: {note}" if note else ""
+
+    if total_hrs > 0 and rate > 0:
+        item_parts = [f"Equipment: {ac_label}"]
+        if routing_text:
+            item_parts.append(routing_text)
+        if note_line:
+            item_parts.append(note_line)
+        items.append({
+            "name": "Aircraft Charter\n" + "\n".join(item_parts),
+            "quantity": str(round(total_hrs, 2)),
+            "unit_cost": str(rate)
+        })
+
+    pax_fee = result.get("pax_fee_usd") or result.get("pax_fee_usd_display") or 0
+    if pax_fee > 0:
+        items.append({
+            "name": "Passenger Taxes & Admin Fees",
+            "quantity": "1",
+            "unit_cost": str(pax_fee)
+        })
+
+    if result.get("overnight_cost_usd", 0) > 0:
+        nights = result.get("overnights") or result.get("wait_days") or 0
+        o_rate = result.get("overnight_rate_usd", 0)
+        items.append({
+            "name": f"Overnight Per Diem x{nights} nights",
+            "quantity": str(nights),
+            "unit_cost": str(o_rate)
+        })
+
+    if result.get("idle_cost_usd", 0) > 0:
+        items.append({
+            "name": "Idle Day Charge",
+            "quantity": "1",
+            "unit_cost": str(result["idle_cost_usd"])
+        })
+
+    for ei in (extra_items or []):
+        items.append({
+            "name": ei.get("name", "Additional Charge"),
+            "quantity": str(ei.get("quantity", "1")),
+            "unit_cost": str(ei.get("unit_cost", "0"))
+        })
+
+    bank_block = get_bank_details_block()
+    terms = OPERATOR.get("invoice", {}).get("terms", "")
+    doc_number = next_record_number(doc_type)
+
+    payload = {
+        "logo": OPERATOR.get("logo_url", ""),
+        "from": get_company_from_block(),
+        "to": client_name,
+        "ship_to": f"Tel: {client_phone}" if client_phone else "",
+        "number": doc_number,
+        "date": datetime.date.today().strftime("%d %b %Y"),
+        "due_date": (datetime.date.today() + datetime.timedelta(days=7)).strftime("%d %b %Y"),
+        "items": items,
+        "discounts": float(discount) if discount else 0,
+        "notes": bank_block,
+        "notes_title": "BANK DETAILS",
+        "terms": terms,
+        "terms_title": "TERMS & CONDITIONS",
+        "currency": "USD",
+        "header": doc_type
+    }
+
+    return payload, doc_number
 
 @app.route("/")
 @login_required
@@ -471,53 +674,169 @@ def quote_calculate():
     result, status = run_quote_engine(data)
     return jsonify(result), status
 
-@app.route("/search_location", methods=["POST"])
-@login_required
-def search_location():
-    data = request.get_json()
-    name = (data.get("name") or "").strip()
-    if not name:
-        return jsonify({"error": "Name required"}), 400
-    disp, coord = resolve_location(name, user_label=name)
-    if not disp:
-        return jsonify({"found": False})
-    parts = coord.split(",")
-    return jsonify({"found": True, "lat": float(parts[0]), "lon": float(parts[1]), "display": disp})
-
-@app.route("/resolve_pin", methods=["POST"])
-@login_required
-def resolve_pin():
-    data = request.get_json()
-    url = (data.get("url") or "").strip()
-    if not url:
-        return jsonify({"error": "URL required"}), 400
-    disp, coord = resolve_location(url)
-    if disp is None:
-        return jsonify({"found": False})
-    parts = coord.split(",")
-    return jsonify({"found": True, "lat": float(parts[0]), "lon": float(parts[1]), "display": disp})
-
 @app.route("/pdf", methods=["POST"])
 @login_required
 def pdf():
     data = request.get_json()
     try:
         result = data["result"]
-        doc_type = data.get("doc_type", "Q")
-        name = data.get("client_name", "Client")
-        email = data.get("client_email", "")
-        phone = data.get("client_phone", "")
+        doc_type = data.get("doc_type", "Quotation")
+        client_name = data.get("client_name", "Client")
+        client_email = data.get("client_email", "")
+        client_phone = data.get("client_phone", "")
         note = data.get("note", "")
         discount = data.get("discount", "0")
-        extras = data.get("extras", [])
-        payload, out_path, number = hq.build_pdf_payload(
-            doc_type, name, email, phone, note, discount, result, extras)
+        extra_items = data.get("extras", [])
+
+        payload, doc_number = build_pdf_payload_from_result(
+            doc_type, result, client_name, client_email,
+            client_phone, note, discount, extra_items)
+
+        out_path = f"/tmp/{doc_number}.pdf"
         hq.generate_pdf(payload, out_path)
+
+        save_record(doc_type, client_name, client_email,
+                    result.get("total_usd", 0), doc_number, {
+                        "ac_label": result.get("ac_label", ""),
+                        "mission": result.get("mission", "")
+                    })
+
         return send_file(out_path, as_attachment=True,
-                         download_name=f"{number}.pdf",
+                         download_name=f"{doc_number}.pdf",
                          mimetype="application/pdf")
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+@app.route("/pdf_all", methods=["POST"])
+@login_required
+def pdf_all():
+    data = request.get_json()
+    try:
+        results = data.get("results", [])
+        doc_type = data.get("doc_type", "Quotation")
+        client_name = data.get("client_name", "Client")
+        client_email = data.get("client_email", "")
+        client_phone = data.get("client_phone", "")
+        note = data.get("note", "")
+        discount = data.get("discount", "0")
+        extra_items = data.get("extras", [])
+
+        generated = []
+        for res in results:
+            if res.get("error"):
+                continue
+            actual = res.get("option_a", res) if res.get("mission") == "return_both" else res
+            actual["rate_usd"] = res.get("rate_usd", actual.get("rate_usd", 0))
+            actual["overnight_rate_usd"] = res.get("overnight_rate_usd", 0)
+            actual["pax_fee_usd_display"] = res.get("pax_fee_usd_display", 0)
+            actual["ac_label"] = res.get("ac_label", "")
+            actual["ac_key"] = res.get("ac_key", "")
+
+            payload, doc_number = build_pdf_payload_from_result(
+                doc_type, actual, client_name, client_email,
+                client_phone, note, discount, extra_items)
+
+            out_path = f"/tmp/{doc_number}.pdf"
+            hq.generate_pdf(payload, out_path)
+
+            save_record(doc_type, client_name, client_email,
+                        actual.get("total_usd", 0), doc_number, {
+                            "ac_label": res.get("ac_label", ""),
+                            "mission": actual.get("mission", "")
+                        })
+            generated.append({
+                "number": doc_number,
+                "path": out_path,
+                "ac_label": res.get("ac_label", "")
+            })
+
+        return jsonify({"success": True, "files": generated})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/pdf_download_temp", methods=["GET"])
+@login_required
+def pdf_download_temp():
+    path = request.args.get("path", "")
+    name = request.args.get("name", "document.pdf")
+    if not path.startswith("/tmp/") or ".." in path:
+        return jsonify({"error": "Invalid path"}), 400
+    return send_file(path, as_attachment=True,
+                     download_name=name, mimetype="application/pdf")
+
+@app.route("/manual_invoice", methods=["POST"])
+@login_required
+def manual_invoice():
+    data = request.get_json()
+    try:
+        client_name = data.get("client_name", "Client")
+        client_email = data.get("client_email", "")
+        client_phone = data.get("client_phone", "")
+        note = data.get("note", "")
+        discount = data.get("discount", "0")
+        terms_override = data.get("terms", "")
+        bank_override = data.get("bank_block", "")
+        line_items = data.get("line_items", [])
+        doc_type = data.get("doc_type", "Invoice")
+        doc_number = next_record_number(doc_type)
+
+        items = []
+        total = 0.0
+        for item in line_items:
+            qty = float(item.get("quantity", 1))
+            unit = float(item.get("unit_cost", 0))
+            items.append({
+                "name": item.get("description", ""),
+                "quantity": str(qty),
+                "unit_cost": str(unit)
+            })
+            total += qty * unit
+
+        bank_block = bank_override if bank_override else get_bank_details_block()
+        terms = terms_override if terms_override else OPERATOR.get("invoice", {}).get("terms", "")
+
+        payload = {
+            "logo": OPERATOR.get("logo_url", ""),
+            "from": get_company_from_block(),
+            "to": client_name,
+            "ship_to": f"Tel: {client_phone}" if client_phone else "",
+            "number": doc_number,
+            "date": datetime.date.today().strftime("%d %b %Y"),
+            "due_date": (datetime.date.today() + datetime.timedelta(days=7)).strftime("%d %b %Y"),
+            "items": items,
+            "discounts": float(discount) if discount else 0,
+            "notes": bank_block,
+            "notes_title": "BANK DETAILS",
+            "terms": terms,
+            "terms_title": "TERMS & CONDITIONS",
+            "currency": "USD",
+            "header": doc_type
+        }
+
+        out_path = f"/tmp/{doc_number}.pdf"
+        hq.generate_pdf(payload, out_path)
+        save_record(doc_type, client_name, client_email, total, doc_number)
+
+        return send_file(out_path, as_attachment=True,
+                         download_name=f"{doc_number}.pdf",
+                         mimetype="application/pdf")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/records", methods=["GET"])
+@login_required
+def get_records():
+    return jsonify(load_records())
+
+@app.route("/records/delete", methods=["POST"])
+@login_required
+def delete_record_route():
+    data = request.get_json()
+    number = data.get("number", "")
+    records = load_records()
+    records = [r for r in records if r.get("number") != number]
+    save_records(records)
+    return jsonify({"success": True})
 
 @app.route("/airports", methods=["GET"])
 @login_required
@@ -598,6 +917,26 @@ def save_aircraft_route():
 def get_config():
     return jsonify(OPERATOR)
 
+@app.route("/settings/config/public", methods=["GET"])
+def get_config_public():
+    safe = {
+        "company_name": OPERATOR.get("company_name", ""),
+        "tagline": OPERATOR.get("tagline", ""),
+        "logo_url": OPERATOR.get("logo_url", ""),
+        "contact": OPERATOR.get("contact", {}),
+        "branding": OPERATOR.get("branding", {}),
+        "trust_bar": OPERATOR.get("trust_bar", []),
+        "footer_tagline": OPERATOR.get("footer_tagline", ""),
+        "aircraft_mode": OPERATOR.get("aircraft_mode", "helicopter"),
+        "landing_field_disclaimer": OPERATOR.get("landing_field_disclaimer", ""),
+        "geo_lock": {"region_name": get_region_name()},
+        "quoting_rules": {
+            "show_distance_to_client": OPERATOR.get("quoting_rules", {}).get("show_distance_to_client", False)
+        },
+        "footer": OPERATOR.get("footer", {})
+    }
+    return jsonify(safe)
+
 @app.route("/settings/save", methods=["POST"])
 @login_required
 def save_settings():
@@ -653,6 +992,32 @@ def fx_rates():
     except Exception:
         pass
     return jsonify({"success": False, "rates": {}})
+
+@app.route("/search_location", methods=["POST"])
+@login_required
+def search_location():
+    data = request.get_json()
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    disp, coord = resolve_location(name, user_label=name)
+    if not disp:
+        return jsonify({"found": False})
+    parts = coord.split(",")
+    return jsonify({"found": True, "lat": float(parts[0]), "lon": float(parts[1]), "display": disp})
+
+@app.route("/resolve_pin", methods=["POST"])
+@login_required
+def resolve_pin():
+    data = request.get_json()
+    url = (data.get("url") or "").strip()
+    if not url:
+        return jsonify({"error": "URL required"}), 400
+    disp, coord = resolve_location(url)
+    if disp is None:
+        return jsonify({"found": False})
+    parts = coord.split(",")
+    return jsonify({"found": True, "lat": float(parts[0]), "lon": float(parts[1]), "display": disp})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

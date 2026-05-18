@@ -5,7 +5,6 @@
     "bank_name": "Family Bank",
     "branch": "Kenyatta Ave (012), Bank Code 070",
     "kes_account": "012000070043",
-    "paybill": "222111",
     "swift": "FABLKENA",
     "usd_account": "012000070044"
   },
@@ -42,9 +41,18 @@
     "powered_url": "https://jetmanglobal.com"
   },
   "footer_tagline": "Fly anywhere in Kenya. Fast, private, unforgettable.",
+  "geo_lock": {
+    "enabled": true,
+    "lat_max": 5,
+    "lat_min": -5,
+    "lon_max": 42,
+    "lon_min": 33.5,
+    "preset": "kenya",
+    "region_name": "Kenya"
+  },
   "invoice": {
     "prefix": "HF",
-    "terms": "Payment due within 7 days of invoice date. All prices in USD unless stated. 50% deposit required to confirm booking. Balance due prior to flight."
+    "terms": "1. Availability - Subject to aircraft and crew availability at time of booking.\n2. Rates & Charges - Apply to general passenger flights only.\n3. Repositioning - All charter quotes include return to base unless otherwise specified.\n4. Payment Terms - 40% deposit required to confirm; balance payable prior to departure.\n5. Cancellations - Cancelled bookings attract 20% surcharge; further charges may apply.\n6. Operational Flexibility - Flights subject to weather, ATC, and operational restrictions.\n7. Fuel - Fuel costs included in quoted hourly rate.\n"
   },
   "landing_field_disclaimer": "Please note: This aircraft requires a runway for landing and take-off. This quote is an estimate only and is not a confirmation of service. The operator will confirm availability and suitability of a landing field at your requested destination before finalising your booking. Tap WhatsApp below to proceed.",
   "logo_url": "https://i.ibb.co/hFfr0RDx/IMG-4294.jpg",
@@ -52,6 +60,8 @@
   "quoting_rules": {
     "currency": "USD",
     "currency_symbol": "$",
+    "ground_time_buffer_enabled": false,
+    "ground_time_buffer_minutes": 0,
     "max_flight_hours_per_day": 10,
     "max_idle_days_between_legs": 1,
     "max_nights_before_pickup_drop": 3,
@@ -60,10 +70,10 @@
     "show_distance_to_client": false
   },
   "social": {
-    "website": "https://heliflightafrica.com",
-    "instagram": "https://instagram.com/heliflightafrica",
     "facebook": "",
-    "twitter": ""
+    "instagram": "https://instagram.com/heliflightafrica",
+    "twitter": "",
+    "website": "https://heliflightafrica.com"
   },
   "tagline": "Private Charters. Anywhere in Kenya.",
   "trust_bar": [
