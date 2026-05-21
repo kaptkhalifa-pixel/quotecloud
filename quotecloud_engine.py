@@ -278,7 +278,7 @@ def _to_coord(s):
 
 def _compute_leg(o_lat, o_lon, d_lat, d_lon, speed):
     nm = haversine_nm(o_lat, o_lon, d_lat, d_lon)
-    hrs = ceil_0_1(max(nm / speed, 0.0))
+    hrs = round(max(nm / speed, 0.0), 4)
     return round(nm, 1), hrs
 
 def _flight_cost(hrs, rate):
