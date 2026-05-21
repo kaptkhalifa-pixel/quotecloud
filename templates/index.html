@@ -1003,12 +1003,15 @@ function renderBilling(res, extraSegs) {
   let allSegs = extraSegs ? [...(res.segments||[]),...extraSegs] : (res.segments||[]);
   let totalHrs = calcTotalHours(allSegs);
   let rows = '';
+
   if (totalHrs > 0 && rate > 0) {
     let fc = Math.round(totalHrs * rate * 100) / 100;
-        let minHrs = res.min_chargeable_hrs || 0;
+    let minHrs = res.min_chargeable_hrs || 0;
     let minMsg = (minHrs > 0 && res.min_applied) ? `<div style="font-size:0.75rem;color:#e65100;background:#fff3e0;border-radius:6px;padding:5px 10px;margin-bottom:6px">Minimum charge of ${minHrs.toFixed(1)} flight hours applies. Quote reflects minimum billable hours.</div>` : '';
     rows += `${minMsg}<div class="billing-row"><span>Aircraft Rental (${totalHrs} hrs @ $${rate.toLocaleString()}/hr)</span><span>USD $${fc.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+  }
   let fee = res.pax_fee_usd || res.pax_fee_usd_display || 0;
+
   if (fee > 0) rows += `<div class="billing-row"><span>Fees & Taxes</span><span>USD $${parseFloat(fee).toLocaleString()}</span></div>`;
   let overnightUsd = res.overnight_usd || res.overnight_cost_usd || 0;
   let oRate = res.overnight_rate_usd || 0;
