@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title id="page-title">Charter Quotes</title>
+<style>body{visibility:hidden}</style>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -321,7 +322,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
       <div id="m-one_way">
         <div class="field-group">
           <label class="field-label">From</label>
-          <input type="text" class="field-input" id="ow-pickup" placeholder="City, airstrip or Maps link">
+          <input type="text" class="field-input" id="ow-pickup" placeholder="name of place or google map pin">
         </div>
         <div class="swap-row">
           <div class="swap-line"></div>
@@ -330,7 +331,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
         </div>
         <div class="field-group">
           <label class="field-label">To</label>
-          <input type="text" class="field-input" id="ow-dropoff" placeholder="City, airstrip or Maps link">
+          <input type="text" class="field-input" id="ow-dropoff" placeholder="name of place or google map pin">
         </div>
         <button class="btn-quote" onclick="submitQuote('one_way')">Get Instant Quote →</button>
       </div>
@@ -338,11 +339,11 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
       <div id="m-return" style="display:none">
         <div class="field-group">
           <label class="field-label">From</label>
-          <input type="text" class="field-input" id="rt-pickup" placeholder="City or airstrip">
+          <input type="text" class="field-input" id="rt-pickup" placeholder="Name of place or google maps pin">
         </div>
         <div class="field-group">
           <label class="field-label">To</label>
-          <input type="text" class="field-input" id="rt-dropoff" placeholder="City or airstrip">
+          <input type="text" class="field-input" id="rt-dropoff" placeholder="Name of place or google maps pin">
         </div>
         <div class="form-row">
           <div class="field-group">
@@ -361,8 +362,10 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
         <div id="safari-legs">
           <div class="leg-row">
             <span class="leg-num">1</span>
-            <input type="text" placeholder="From" class="leg-origin">
-            <input type="text" placeholder="To" class="leg-dest">
+            <input type="text" placeholder="placeholder="Name of place or Google Maps pin"
+" class="leg-origin">
+            <input type="text" placeholder="placeholder="Name of place or Google Maps pin"
+" class="leg-dest">
             <input type="text" placeholder="Date" class="leg-date" style="max-width:100px">
           </div>
         </div>
@@ -434,8 +437,9 @@ async function init() {
     let kr = await fetch('/get_maps_key');
     let kd = await kr.json();
     GAPI_KEY = kd.key || '';
-    applyBranding();
-    loadFX();
+applyBranding();
+document.body.style.visibility = 'visible';
+loadFX();
   } catch(e) { console.error('Init failed:', e); }
 }
 
