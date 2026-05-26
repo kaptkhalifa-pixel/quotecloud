@@ -309,6 +309,16 @@ def resolve_location(s, user_label=None):
             s = expanded
         except Exception:
             pass
+        q_coord = re.search(r'[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)', s)
+    if q_coord:
+        try:
+            lat, lon = float(q_coord.group(1)), float(q_coord.group(2))
+            if check_geo_lock(lat, lon):
+                display = reverse_geocode(lat, lon) or f"Pin, {lat:.5f}, {lon:.5f}"
+                return display, f"{lat},{lon}"
+        except Exception:
+            pass
+
     s = s.replace(",+", ",").replace("%2C+", ",")
     try:
         lat, lon = hq.parse_map_pin(s)
