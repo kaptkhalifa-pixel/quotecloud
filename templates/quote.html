@@ -527,6 +527,8 @@ function extractCoordsFromUrl(url) {
   if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
   let m3 = url.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m3) return { lat: parseFloat(m3[1]), lng: parseFloat(m3[2]) };
+  let m4 = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (m4) return { lat: parseFloat(m4[1]), lng: parseFloat(m4[2]) };
   return null;
 }
 
