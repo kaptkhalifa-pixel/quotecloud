@@ -1213,9 +1213,10 @@ def get_config_public():
         "aircraft_mode": OPERATOR.get("aircraft_mode", "helicopter"),
         "landing_field_disclaimer": OPERATOR.get("landing_field_disclaimer", ""),
         "geo_lock": {"region_name": get_region_name()},
-        "quoting_rules": {
+                "quoting_rules": {
             "show_distance_to_client": OPERATOR.get("quoting_rules", {}).get("show_distance_to_client", False),
-            "quote_validity_hours": OPERATOR.get("quoting_rules", {}).get("quote_validity_hours", 48)
+            "quote_validity_hours": OPERATOR.get("quoting_rules", {}).get("quote_validity_hours", 48),
+            "show_rate_breakdown": OPERATOR.get("quoting_rules", {}).get("show_rate_breakdown", True)
         }
     }
     return jsonify(safe)
