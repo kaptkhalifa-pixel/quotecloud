@@ -1340,5 +1340,21 @@ def resolve_pin():
     parts = coord.split(",")
     return jsonify({"found": True, "lat": float(parts[0]), "lon": float(parts[1]), "display": disp})
 
+@app.route("/backup/configs", methods=["GET"])
+@login_required
+def backup_configs():
+    configs = {}
+    for fname in [OPERATOR_CONFIG_FILE, AIRCRAFT_CONFIG_FILE, RECORDS_FILE]:
+        p = pathlib.Path(fname)
+        if p.exists():
+            try:
+                configs[fname] = json.loads(p.read_text())
+            except Exception:
+                configs[fname] = {}
+        else:
+            configs[fname] = {}
+    return jsonify(configs)
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+
