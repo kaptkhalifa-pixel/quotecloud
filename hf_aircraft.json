@@ -1,15 +1,15 @@
 {
   "as350": {
+    "active": true,
+    "home_airstrip": "Wilson Airport, Nairobi",
+    "idle_day_rate": 2200,
     "label": "Airbus AS350",
+    "overnight_rate": 300,
+    "pax_fee": 100,
+    "rate": 2200,
+    "routing_mode": "standard",
     "seater": 5,
     "speed": 120,
-    "rate": 2200,
-    "pax_fee": 100,
-    "overnight_rate": 300,
-    "idle_day_rate": 2200,
-    "active": true,
-    "type": "helicopter",
-    "home_airstrip": "Wilson Airport, Nairobi",
-    "routing_mode": "standard"
+    "type": "helicopter"
   }
 }
