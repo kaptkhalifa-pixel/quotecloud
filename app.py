@@ -33,6 +33,8 @@ if not OPERATOR.get("company_name"):
     OPERATOR["company_name"] = "Quotecloud"
 if not OPERATOR.get("logo_url"):
     OPERATOR["logo_url"] = ""
+if not OPERATOR.get("footer"):
+    OPERATOR["footer"] = {"powered_by": "Quotecloud — Jetman Global", "powered_url": "https://jetmanglobal.com"}
 
 app.secret_key = os.environ.get("SECRET_KEY", OPERATOR.get("env", {}).get("secret_key", "qc-secret-2026"))
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
