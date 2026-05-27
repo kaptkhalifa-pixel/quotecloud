@@ -1341,8 +1341,10 @@ def resolve_pin():
     return jsonify({"found": True, "lat": float(parts[0]), "lon": float(parts[1]), "display": disp})
 
 @app.route("/backup/configs", methods=["GET"])
-@login_required
 def backup_configs():
+    key = request.args.get("key", "")
+    if key != app.secret_key:
+        return jsonify({"error": "Unauthorized"}), 401
     configs = {}
     for fname in [OPERATOR_CONFIG_FILE, AIRCRAFT_CONFIG_FILE, RECORDS_FILE]:
         p = pathlib.Path(fname)
